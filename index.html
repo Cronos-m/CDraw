@@ -62,10 +62,10 @@
     .tool-button svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .tool-button:hover { background: var(--color-bg); }
     .brush-control { position: relative; display: inline-flex; }
-    .brush-panel { position: fixed; z-index: 60; display: none; width: min(180px, calc(100vw - 20px)); max-height: calc(100dvh - var(--toolbar-height) - 20px); padding: 10px 12px; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--shadow); }
+    .brush-panel { position: fixed; z-index: 60; display: none; box-sizing: border-box; width: min(180px, calc(100vw - 20px)); max-height: calc(100dvh - var(--toolbar-height) - 20px); padding: 10px 12px; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--shadow); }
     .brush-panel.open { display: block; }
     .brush-panel label { display: block; margin-bottom: 6px; color: var(--color-text); font-size: .8rem; text-align: center; }
-    .brush-panel input { width: 100%; accent-color: var(--color-primary); cursor: pointer; }
+    .brush-panel input { display: block; box-sizing: border-box; width: 100%; max-width: 100%; margin: 0 auto; accent-color: var(--color-primary); cursor: pointer; }
     .color-control { position: relative; display: inline-flex; }
     .color-panel { position: fixed; z-index: 60; bottom: calc(var(--toolbar-height) + 8px); display: none; width: 188px; padding: 10px; grid-template-columns: repeat(4, 1fr); gap: 8px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--shadow); }
     .color-panel.open { display: grid; }
