@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d4f7a">
+  <meta name="description" content="CDraw, bloc de dibujo táctil con magia por voz.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png" type="image/png">
+  <title>CDraw</title>
+  <style>
+    :root {
+      --color-primary: #0d4f7a;
+      --color-primary-dark: #093a5a;
+      --color-bg: #f5f6f8;
+      --color-surface: #ffffff;
+      --color-text: #1c2630;
+      --color-muted: #64707c;
+      --color-border: #d7dde3;
+      --canvas-bg: #ffffff;
+      --danger: #c0392b;
+      --shadow: 0 5px 18px rgba(20, 35, 50, .12);
+      --header-height: 56px;
+      --toolbar-height: 64px;
+    }
+    body.dark-mode {
+      --color-bg: #121416;
+      --color-surface: #1c2024;
+      --color-text: #f4f6f8;
+      --color-muted: #a9b2ba;
+      --color-border: #3a424a;
+      --canvas-bg: #0a0a0a;
+      --shadow: 0 5px 18px rgba(0, 0, 0, .35);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--color-bg); color: var(--color-text); }
+    body { overflow-x: hidden; }
+    button, input, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+    .hidden { display: none !important; }
+    .app-header { height: var(--header-height); position: fixed; z-index: 20; top: 0; left: 0; right: 0; background: var(--color-primary); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); }
+    .app-header h1 { font-size: 1rem; margin: 0; letter-spacing: .08em; color: transparent; user-select: none; }
+    .menu-button { position: absolute; left: 8px; width: 42px; height: 42px; background: transparent; color: white; font-size: 1.5rem; line-height: 1; }
+    main { padding-top: var(--header-height); min-height: 100vh; }
+    .view { min-height: calc(100vh - var(--header-height)); padding: 24px; }
+    .home-view { display: grid; place-items: center; text-align: center; }
+    .home-content { width: min(100%, 460px); }
+    .home-logo { width: 112px; height: 112px; object-fit: contain; display: block; margin: 8px auto 22px; }
+    .home-content h2 { margin: 0 0 10px; font-size: 2rem; }
+    .home-content p { color: var(--color-muted); margin: 0 auto 28px; line-height: 1.55; }
+    .home-actions { display: grid; gap: 12px; }
+    .primary-button, .secondary-button, .danger-button { min-height: 44px; border-radius: 9px; padding: 10px 18px; font-weight: 650; transition: transform .15s, filter .15s; }
+    .primary-button { background: var(--color-primary); color: white; }
+    .secondary-button { background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text); }
+    .danger-button { background: var(--danger); color: white; }
+    button:hover { filter: brightness(1.08); } button:active { transform: scale(.98); }
+    .canvas-view { height: calc(100vh - var(--header-height)); min-height: 260px; padding: 0; position: relative; overflow: hidden; }
+    #drawingCanvas { display: block; width: 100%; height: calc(100% - var(--toolbar-height)); touch-action: none; background: var(--canvas-bg); cursor: crosshair; }
+    .canvas-toolbar { position: absolute; bottom: 0; left: 0; right: 0; min-height: var(--toolbar-height); padding: 7px 9px; display: flex; gap: 6px; align-items: center; justify-content: center; background: var(--color-surface); border-top: 1px solid var(--color-border); box-shadow: 0 -2px 10px rgba(0,0,0,.08); overflow-x: auto; }
+    .tool-button { min-width: 46px; height: 46px; padding: 3px 7px; border-radius: 8px; color: var(--color-text); background: transparent; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; white-space: nowrap; font-size: .68rem; }
+    .tool-button svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tool-button:hover { background: var(--color-bg); }
+    .save-button { background: var(--color-primary); color: white; position: relative; overflow: hidden; }
+    .save-button.listening::after { content: ''; position: absolute; width: 9px; height: 9px; top: 5px; right: 5px; border-radius: 50%; background: #e53935; animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: .25; transform: scale(.65); } }
+    .press-progress { position: fixed; z-index: 30; left: 0; bottom: 0; height: 3px; width: 0; background: #e53935; pointer-events: none; }
+    .section-title { margin: 0 0 18px; font-size: 1.45rem; }
+    .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 18px; box-shadow: var(--shadow); }
+    .gallery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .gallery-item { min-width: 0; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 10px; padding: 8px; cursor: pointer; }
+    .gallery-item img { width: 100%; aspect-ratio: 1; object-fit: contain; display: block; background: repeating-conic-gradient(#eef0f2 0 25%, #fff 0 50%) 50% / 16px 16px; border-radius: 6px; }
+    body.dark-mode .gallery-item img { background: repeating-conic-gradient(#32373b 0 25%, #202427 0 50%) 50% / 16px 16px; }
+    .gallery-date { display: block; font-size: .75rem; color: var(--color-muted); margin: 8px 2px 0; }
+    .empty-state { text-align: center; color: var(--color-muted); padding: 44px 15px; }
+    .settings-grid { display: grid; gap: 16px; max-width: 720px; }
+    .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; }
+    .setting-row label { font-weight: 600; }
+    input[type="color"] { width: 60px; height: 38px; padding: 2px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); }
+    input[type="range"] { accent-color: var(--color-primary); width: min(220px, 48vw); }
+    .range-value { min-width: 42px; text-align: right; color: var(--color-muted); }
+    .magic-form { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 14px; }
+    .text-input { flex: 1 1 180px; min-height: 42px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg); color: var(--color-text); padding: 9px 12px; }
+    .magic-list { display: grid; gap: 8px; }
+    .magic-entry { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; }
+    .magic-word { font-weight: 650; }
+    .magic-actions { display: flex; gap: 7px; }
+    .small-button { min-height: 34px; padding: 5px 10px; border-radius: 6px; background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); font-size: .86rem; }
+    .tutorial-card { line-height: 1.6; }
+    .tutorial-card > summary { cursor: pointer; font-size: 1.12rem; font-weight: 700; list-style-position: inside; }
+    .tutorial-card[open] > summary { margin-bottom: 14px; }
+    .tutorial-card h4 { margin: 18px 0 6px; color: var(--color-primary); }
+    .tutorial-card p { margin: 7px 0; }
+    .tutorial-card ol, .tutorial-card ul { margin: 8px 0 12px; padding-left: 24px; }
+    .tutorial-card li { margin: 6px 0; }
+    .tutorial-note { border-left: 4px solid var(--color-primary); background: var(--color-bg); padding: 10px 12px; border-radius: 0 7px 7px 0; margin: 12px 0; }
+    .tutorial-key { font-weight: 700; color: var(--color-primary); }
+    .drawer-backdrop { position: fixed; z-index: 40; inset: 0; background: rgba(0,0,0,.35); }
+    .drawer { position: fixed; z-index: 41; top: 0; bottom: 0; left: 0; width: min(310px, 86vw); padding: 72px 18px 20px; background: var(--color-surface); box-shadow: var(--shadow); transform: translateX(-100%); transition: transform .2s ease; }
+    .drawer.open { transform: translateX(0); }
+    .drawer nav { display: grid; gap: 5px; }
+    .drawer nav button { text-align: left; padding: 13px 12px; background: transparent; color: var(--color-text); border-radius: 7px; }
+    .drawer nav button:hover { background: var(--color-bg); }
+    .drawer-divider { border: 0; border-top: 1px solid var(--color-border); margin: 18px 0; }
+    .theme-label { font-weight: 650; font-size: .9rem; }
+    .theme-options { display: flex; gap: 10px; margin-top: 10px; }
+    .theme-color { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--color-surface); outline: 1px solid var(--color-border); }
+    .switch-row { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+    .switch { width: 44px; height: 24px; border-radius: 14px; background: #8c969d; padding: 3px; }
+    .switch span { display: block; width: 18px; height: 18px; border-radius: 50%; background: white; transition: transform .2s; }
+    .switch.active { background: var(--color-primary); } .switch.active span { transform: translateX(20px); }
+    .modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.58); }
+    .modal { width: min(560px, 100%); max-height: 90vh; overflow: auto; background: var(--color-surface); border-radius: 12px; padding: 16px; }
+    .modal img { max-width: 100%; max-height: 65vh; display: block; margin: 0 auto 16px; object-fit: contain; background: repeating-conic-gradient(#eef0f2 0 25%, #fff 0 50%) 50% / 16px 16px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .toast { position: fixed; z-index: 100; left: 50%; bottom: 82px; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none; color: white; background: #202428; border-radius: 99px; padding: 10px 17px; font-size: .9rem; transition: opacity .2s, transform .2s; max-width: calc(100% - 30px); text-align: center; }
+    .toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    @media (min-width: 600px) { .gallery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .view { padding: 30px; } }
+    @media (min-width: 1000px) { .gallery-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <header class="app-header"><button class="menu-button" id="menuButton" aria-label="Abrir menú">☰</button><h1>CDraw</h1></header>
+  <aside class="drawer" id="drawer" aria-label="Menú principal">
+    <nav>
+      <button data-view="home">Inicio</button><button data-view="canvas">Dibujar</button><button data-view="gallery">Galería</button><button data-view="settings">Configuración</button>
+    </nav>
+    <hr class="drawer-divider">
+    <div class="theme-label">Color principal</div>
+    <div class="theme-options" id="themeOptions"></div>
+    <div class="switch-row"><span class="theme-label">Modo oscuro</span><button class="switch" id="darkSwitch" aria-label="Cambiar modo oscuro"><span></span></button></div>
+  </aside>
+  <div class="drawer-backdrop hidden" id="drawerBackdrop"></div>
+  <main>
+    <section class="view home-view" id="view-home">
+      <div class="home-content"><img class="home-logo" src="icon-192.png" alt="CDraw"><h2>CDraw</h2><p>Dibuja, guarda tus creaciones y dales vida con palabras mágicas.</p><div class="home-actions"><button class="primary-button" data-view="canvas">Nuevo dibujo</button><button class="secondary-button" data-view="gallery">Ver galería</button><button class="secondary-button" data-view="settings">Configuración</button><button class="secondary-button hidden" id="installButton">Instalar App</button></div></div>
+    </section>
+    <section class="view canvas-view hidden" id="view-canvas"><canvas id="drawingCanvas" aria-label="Lienzo de dibujo"></canvas><div class="canvas-toolbar">
+      <button class="tool-button" id="clearButton" title="Limpiar"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v6M14 10v6"/></svg><span>Limpiar</span></button>
+      <button class="tool-button" id="colorButton" title="Color"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 0-4H12a2 2 0 0 1 0-4h2a7 7 0 0 0 0-10z"/><circle cx="7.5" cy="11" r=".7"/><circle cx="9" cy="7.5" r=".7"/><circle cx="13" cy="6.5" r=".7"/></svg><span>Color</span></button>
+      <button class="tool-button" id="sizeButton" title="Grosor"><svg viewBox="0 0 24 24"><path d="M4 18h16M4 14h16M4 10h16M4 6h16"/></svg><span id="sizeLabel">Grosor</span></button>
+      <button class="tool-button" id="undoButton" title="Deshacer"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 6 6"/></svg><span>Deshacer</span></button>
+      <button class="tool-button" id="redoButton" title="Rehacer"><svg viewBox="0 0 24 24"><path d="m15 7 5 5-5 5M20 12H10a6 6 0 0 0-6 6"/></svg><span>Rehacer</span></button>
+      <button class="tool-button hidden" id="pauseButton" title="Pausar escucha"><svg viewBox="0 0 24 24"><path d="M7 5v14M17 5v14"/></svg><span>Pausar</span></button>
+      <button class="tool-button save-button" id="saveButton" title="Guardar o mantener para escuchar"><svg viewBox="0 0 24 24"><path d="M5 4h12l2 2v14H5zM8 4v6h8V4M8 20v-6h8v6"/></svg><span>Guardar</span></button>
+    </div></section>
+    <section class="view hidden" id="view-gallery"><h2 class="section-title">Galería</h2><div class="gallery-grid" id="galleryGrid"></div></section>
+    <section class="view hidden" id="view-settings"><h2 class="section-title">Configuración</h2><div class="settings-grid">
+      <div class="card"><h3>Apariencia del lienzo</h3><div class="setting-row"><label for="bgColor">Color de fondo</label><input type="color" id="bgColor"></div><div class="setting-row"><label for="defaultSize">Grosor predeterminado</label><div><input type="range" min="1" max="30" id="defaultSize"><span class="range-value" id="defaultSizeValue"></span></div></div></div>
+      <div class="card"><h3>Dibujos mágicos</h3><p>Vincula una palabra a lo que está dibujado actualmente en el lienzo.</p><div class="magic-form"><input class="text-input" id="magicWord" type="text" placeholder="Palabra clave" autocomplete="off"><button class="primary-button" id="magicSaveButton">Vincular dibujo actual del lienzo</button></div><div class="magic-list" id="magicList"></div></div>
+      <div class="card"><h3>Respaldo de datos</h3><p>Exporta o importa la galería, ajustes, tema y dibujos mágicos.</p><div class="magic-form"><button class="secondary-button" id="exportButton">Exportar respaldo</button><button class="secondary-button" id="importButton">Importar respaldo</button><input type="file" id="importFile" accept="application/json" class="hidden"></div></div>
+      <div class="card"><h3>Disponibilidad sin conexión</h3><p id="offlineStatus">Comprobando preparación local...</p><p>Abre CDraw al menos una vez con conexión para que el navegador guarde sus recursos. Después puedes probar el modo avión.</p></div>
+      <details class="card tutorial-card" id="tutorialCard" open><summary>Tutorial completo para configurar y usar CDraw</summary>
+        <p>Este tutorial reúne los pasos principales para configurar y utilizar CDraw. Lee los apartados en orden la primera vez y vuelve a ellos cuando necesites recordar una función.</p>
+        <h4>1. Crear tu primer dibujo</h4>
+        <ol><li>Entra en <span class="tutorial-key">Dibujar</span> desde el menú o pulsa <span class="tutorial-key">Nuevo dibujo</span> en Inicio.</li><li>Dibuja con el dedo, un lápiz táctil o el ratón. Mantén el dedo apoyado y arrástralo suavemente.</li><li>Usa <span class="tutorial-key">Color</span> para escoger un color y <span class="tutorial-key">Grosor</span> para cambiar el tamaño del trazo.</li><li>Si te equivocas, pulsa <span class="tutorial-key">Deshacer</span>. Para recuperar algo deshecho, pulsa <span class="tutorial-key">Rehacer</span>.</li><li>Pulsa <span class="tutorial-key">Guardar</span> una vez. El dibujo se guardará en la Galería con fondo transparente.</li></ol>
+        <h4>2. Crear una palabra mágica</h4>
+        <ol><li>Primero dibuja en el lienzo. Si ya lo guardaste, puedes volver a cargarlo desde la Galería y editarlo.</li><li>Abre <span class="tutorial-key">Configuración</span> y busca <span class="tutorial-key">Dibujos mágicos</span>.</li><li>Escribe una palabra sencilla, por ejemplo <strong>estrella</strong>. No es necesario escribir una frase completa.</li><li>Pulsa <span class="tutorial-key">Vincular dibujo actual del lienzo</span>. La palabra aparecerá en la lista.</li><li>Para cambiar el dibujo de una palabra, pulsa <span class="tutorial-key">Editar</span>, modifica el dibujo y vuelve a guardarlo con el botón de actualización.</li><li>Para quitar una palabra, pulsa <span class="tutorial-key">Eliminar</span>. La acción se realiza directamente.</li></ol>
+        <div class="tutorial-note"><strong>Importante:</strong> la palabra se detecta aunque esté dentro de una frase, pero debe pronunciarse completa. Por ejemplo, la palabra mágica <strong>estrella</strong> funciona en “dibuja una estrella”.</div>
+        <h4>3. Activar y detener la escucha</h4>
+        <ol><li>Ve al lienzo y mantén pulsado el botón <span class="tutorial-key">Guardar</span> durante tres segundos.</li><li>Cuando aparezca el punto rojo y el mensaje de escucha, puedes soltar el botón.</li><li>El navegador puede preguntar si permites usar el micrófono. Elige <span class="tutorial-key">Permitir</span>.</li><li>Di una frase que contenga una palabra mágica. CDraw cargará automáticamente el dibujo asociado.</li><li>Para dejar de escuchar, pulsa el botón rojo <span class="tutorial-key">Pausar</span> o vuelve a Inicio.</li></ol>
+        <p>La escucha se activa manteniendo pulsado el botón durante tres segundos. Una pulsación corta del mismo botón guarda el dibujo; para detener la escucha utiliza el botón rojo <span class="tutorial-key">Pausar</span> o vuelve a Inicio.</p>
+        <h4>4. Ver, editar y borrar dibujos</h4>
+        <ol><li>Abre <span class="tutorial-key">Galería</span> para ver todos los dibujos guardados.</li><li>Pulsa una miniatura para abrirla.</li><li>Usa <span class="tutorial-key">Editar</span> para cargarla en el lienzo y modificarla.</li><li>Usa <span class="tutorial-key">Eliminar</span> para borrarla de la Galería.</li></ol>
+        <h4>5. Cambiar colores y apariencia</h4>
+        <ul><li>En el menú lateral puedes elegir el color principal de la aplicación.</li><li>Activa <span class="tutorial-key">Modo oscuro</span> si prefieres una pantalla oscura.</li><li>Los dibujos se adaptan automáticamente al modo claro u oscuro. Los trazos transparentes se conservan sin rectángulos de fondo.</li><li>En Configuración puedes seleccionar el color del fondo del lienzo y el grosor predeterminado.</li></ul>
+        <h4>6. Hacer una copia de seguridad</h4>
+        <ol><li>En Configuración, pulsa <span class="tutorial-key">Exportar respaldo</span>.</li><li>El dispositivo descargará un archivo cuyo nombre empieza por <strong>cdraw-respaldo</strong>. No lo borres si quieres conservar tus datos.</li><li>Guarda ese archivo en un lugar seguro, como tu carpeta de documentos o una nube personal.</li><li>Para recuperar los datos, pulsa <span class="tutorial-key">Importar respaldo</span> y selecciona ese archivo.</li></ol>
+        <div class="tutorial-note"><strong>Recomendación:</strong> exporta un respaldo antes de cambiar de dispositivo, borrar los datos del navegador o desinstalar la aplicación. Los datos se guardan localmente en este dispositivo.</div>
+        <h4>7. Solución de problemas</h4>
+        <ul><li><strong>No puedo dibujar:</strong> comprueba que estás en Dibujar y toca dentro del lienzo, no sobre la barra inferior. Recarga la página si el problema continúa.</li><li><strong>No escucha mi voz:</strong> usa un navegador compatible, comprueba que el dispositivo tiene micrófono y revisa que el permiso del micrófono esté permitido para esta página.</li><li><strong>La palabra no activa el dibujo:</strong> pronúnciala claramente y revisa que esté escrita en la lista de Dibujos mágicos. CDraw no activa palabras incompletas.</li><li><strong>No aparece mi dibujo:</strong> revisa la Galería. Si cambiaste de dispositivo o borraste los datos del navegador, utiliza Importar respaldo.</li><li><strong>La aplicación se ve antigua:</strong> recarga la página desde Internet. CDraw está configurada para cargar siempre la versión más reciente.</li></ul>
+        <h4>8. Atajos opcionales</h4>
+        <p>En un ordenador puedes usar <span class="tutorial-key">Ctrl+Z</span> para deshacer, <span class="tutorial-key">Ctrl+Shift+Z</span> para rehacer y <span class="tutorial-key">Ctrl+S</span> para guardar. En Mac, utiliza la tecla <span class="tutorial-key">Command</span> en lugar de Ctrl.</p>
+      </details>
+    </div></section>
+  </main>
+  <div class="modal-backdrop hidden" id="modalBackdrop"><div class="modal" role="dialog" aria-modal="true"><img id="modalImage" alt="Dibujo seleccionado"><div class="modal-actions"><button class="secondary-button" id="modalClose">Cerrar</button><button class="secondary-button" id="modalEdit">Editar</button><button class="danger-button" id="modalDelete">Eliminar</button></div></div></div>
+  <div class="press-progress" id="pressProgress"></div><div class="toast" id="toast" role="status"></div>
+  <script>
+    'use strict';
+    const KEYS = { gallery: 'cdraw_gallery', settings: 'cdraw_settings', theme: 'cdraw_theme_color', dark: 'cdraw_dark_mode', magic: 'cdraw_magic_drawings' };
+    const THEMES = ['#0d4f7a', '#27ae60', '#8e44ad', '#e67e22', '#c0392b'];
+    const state = { view: 'home', drawingColor: null, brushSize: 4, history: [], historyIndex: -1, isDrawing: false, listening: false, recognition: null, cooldown: 0, modalId: null, editingWord: null, installPrompt: null, bgColor: '#ffffff' };
+    const $ = id => document.getElementById(id);
+    const canvas = $('drawingCanvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const getJSON = (key, fallback) => { try { const value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; } catch { return fallback; } };
+    const setJSON = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+    const settings = () => getJSON(KEYS.settings, { bgColor: '#ffffff', defaultSize: 4 });
+    function toast(message) { const el = $('toast'); el.textContent = message; el.classList.add('visible'); clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('visible'), 2200); }
+    function normalize(text) { return text.toLocaleLowerCase('es-ES').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); }
+    function escapeHTML(text) { return text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char])); }
+    function applyTheme() { const color = localStorage.getItem(KEYS.theme) || THEMES[0]; document.documentElement.style.setProperty('--color-primary', color); document.documentElement.style.setProperty('--color-primary-dark', color); document.querySelector('meta[name="theme-color"]').setAttribute('content', color); const dark = localStorage.getItem(KEYS.dark) === 'true'; document.body.classList.toggle('dark-mode', dark); $('darkSwitch').classList.toggle('active', dark); state.bgColor = settings().bgColor || (dark ? '#0a0a0a' : '#ffffff'); document.documentElement.style.setProperty('--canvas-bg', state.bgColor); }
+    function setupThemes() { $('themeOptions').innerHTML = THEMES.map(color => `<button class="theme-color" style="background:${color}" data-theme="${color}" aria-label="Usar color ${color}"></button>`).join(''); document.querySelectorAll('[data-theme]').forEach(button => button.addEventListener('click', () => { localStorage.setItem(KEYS.theme, button.dataset.theme); applyTheme(); })); }
+    function navigate(view) { if (state.listening && view !== 'canvas') stopListening(); state.view = view; document.querySelectorAll('.view').forEach(el => el.classList.toggle('hidden', el.id !== `view-${view}`)); closeDrawer(); if (view === 'canvas') requestAnimationFrame(resizeCanvas); if (view === 'gallery') renderGallery(); if (view === 'settings') { renderMagicList(); loadSettingsForm(); } }
+    function openDrawer() { $('drawer').classList.add('open'); $('drawerBackdrop').classList.remove('hidden'); }
+    function closeDrawer() { $('drawer').classList.remove('open'); $('drawerBackdrop').classList.add('hidden'); }
+    function resizeCanvas() { if (state.view !== 'canvas') return; const rect = canvas.getBoundingClientRect(); const old = canvas.width && canvas.height ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null; const ratio = Math.max(1, window.devicePixelRatio || 1); canvas.width = Math.max(1, Math.floor(rect.width * ratio)); canvas.height = Math.max(1, Math.floor(rect.height * ratio)); ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (old) { const off = document.createElement('canvas'); off.width = old.width; off.height = old.height; off.getContext('2d').putImageData(old, 0, 0); ctx.drawImage(off, 0, 0, rect.width, rect.height); } else clearCanvas(false); }
+    function clearCanvas(saveHistory = true) { const rect = canvas.getBoundingClientRect(); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.restore(); ctx.fillStyle = state.bgColor; ctx.fillRect(0, 0, canvas.width, canvas.height); if (saveHistory) pushHistory(); }
+    function snapshot() { return ctx.getImageData(0, 0, canvas.width, canvas.height); }
+    function pushHistory() { const image = snapshot(); if (state.historyIndex < state.history.length - 1) state.history = state.history.slice(0, state.historyIndex + 1); state.history.push(image); if (state.history.length > 30) state.history.shift(); state.historyIndex = state.history.length - 1; }
+    function restoreHistory(index) { if (index < 0 || index >= state.history.length) return; ctx.putImageData(state.history[index], 0, 0); state.historyIndex = index; }
+    function undo() { if (state.historyIndex > 0) restoreHistory(state.historyIndex - 1); }
+    function redo() { if (state.historyIndex < state.history.length - 1) restoreHistory(state.historyIndex + 1); }
+    function pointerPosition(event) { const rect = canvas.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; }
+    function beginDraw(event) { if (state.listening) return; state.isDrawing = true; canvas.setPointerCapture(event.pointerId); const p = pointerPosition(event); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.strokeStyle = state.drawingColor; ctx.lineWidth = state.brushSize; ctx.lineTo(p.x + .1, p.y + .1); ctx.stroke(); }
+    function draw(event) { if (!state.isDrawing) return; const p = pointerPosition(event); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+    function endDraw() { if (!state.isDrawing) return; state.isDrawing = false; ctx.closePath(); pushHistory(); }
+    function getCanvasDataURLTransparent() { const copy = document.createElement('canvas'); copy.width = canvas.width; copy.height = canvas.height; const c = copy.getContext('2d'); c.drawImage(canvas, 0, 0); const image = c.getImageData(0, 0, copy.width, copy.height); const bg = hexToRGB(state.bgColor); for (let i = 0; i < image.data.length; i += 4) { const d = Math.abs(image.data[i] - bg.r) + Math.abs(image.data[i + 1] - bg.g) + Math.abs(image.data[i + 2] - bg.b); if (d <= 45) image.data[i + 3] = 0; } c.putImageData(image, 0, 0); return copy.toDataURL('image/png'); }
+    function hexToRGB(hex) { const value = hex.replace('#', ''); return { r: parseInt(value.slice(0, 2), 16), g: parseInt(value.slice(2, 4), 16), b: parseInt(value.slice(4, 6), 16) }; }
+    function adaptImageToMode(dataUrl, targetDark = document.body.classList.contains('dark-mode')) { return new Promise(resolve => { const image = new Image(); image.onload = () => { const c = document.createElement('canvas'); c.width = image.naturalWidth; c.height = image.naturalHeight; const x = c.getContext('2d'); x.drawImage(image, 0, 0); const pixels = x.getImageData(0, 0, c.width, c.height), d = pixels.data; const corner = [d[0], d[1], d[2], d[3]]; let savedDark; if (corner[3] > 250) { const bg = { r: corner[0], g: corner[1], b: corner[2] }; for (let i = 0; i < d.length; i += 4) { if (Math.abs(d[i] - bg.r) + Math.abs(d[i+1] - bg.g) + Math.abs(d[i+2] - bg.b) <= 120) d[i+3] = 0; } savedDark = (bg.r + bg.g + bg.b) < 384; } else { let total = 0, count = 0; for (let i = 0; i < d.length; i += 4) if (d[i+3] > 0) { total += d[i] + d[i+1] + d[i+2]; count++; } savedDark = count ? total / count < 384 : false; } if (savedDark !== targetDark) for (let i = 0; i < d.length; i += 4) if (d[i+3]) { d[i] = 255 - d[i]; d[i+1] = 255 - d[i+1]; d[i+2] = 255 - d[i+2]; } x.putImageData(pixels, 0, 0); resolve(c.toDataURL('image/png')); }; image.src = dataUrl; }); }
+    function saveDrawing() { const dataUrl = getCanvasDataURLTransparent(); const gallery = getJSON(KEYS.gallery, []); gallery.unshift({ id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, dataUrl, date: new Date().toISOString() }); setJSON(KEYS.gallery, gallery); toast('Dibujo guardado en la galería'); }
+    function renderGallery() { const grid = $('galleryGrid'), gallery = getJSON(KEYS.gallery, []); if (!gallery.length) { grid.innerHTML = '<div class="empty-state">Todavía no hay dibujos guardados.</div>'; return; } grid.innerHTML = ''; gallery.forEach(item => { const article = document.createElement('article'); article.className = 'gallery-item'; const img = document.createElement('img'); img.alt = 'Dibujo guardado'; adaptImageToMode(item.dataUrl).then(src => img.src = src); const date = document.createElement('span'); date.className = 'gallery-date'; date.textContent = new Date(item.date).toLocaleDateString('es-ES'); article.append(img, date); article.addEventListener('click', () => openModal(item)); grid.append(article); }); }
+    function openModal(item) { state.modalId = item.id; $('modalBackdrop').classList.remove('hidden'); adaptImageToMode(item.dataUrl).then(src => $('modalImage').src = src); }
+    function closeModal() { $('modalBackdrop').classList.add('hidden'); state.modalId = null; }
+    function editGalleryItem() { const item = getJSON(KEYS.gallery, []).find(x => x.id === state.modalId); if (!item) return; closeModal(); navigate('canvas'); loadImageToCanvas(item.dataUrl); }
+    function deleteGalleryItem() { setJSON(KEYS.gallery, getJSON(KEYS.gallery, []).filter(x => x.id !== state.modalId)); closeModal(); renderGallery(); toast('Dibujo eliminado'); }
+    function loadImageToCanvas(dataUrl) { adaptImageToMode(dataUrl).then(src => { const image = new Image(); image.onload = () => { clearCanvas(false); const scale = Math.min(canvas.width / image.width, canvas.height / image.height); const w = image.width * scale, h = image.height * scale; ctx.drawImage(image, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h); pushHistory(); }; image.src = src; }); }
+    function loadSettingsForm() { const s = settings(); $('bgColor').value = s.bgColor || '#ffffff'; $('defaultSize').value = s.defaultSize || 4; $('defaultSizeValue').textContent = `${$('defaultSize').value}px`; }
+    function renderMagicList() { const list = $('magicList'), magic = getJSON(KEYS.magic, {}), words = Object.keys(magic); if (!words.length) { list.innerHTML = '<div class="empty-state">No hay dibujos mágicos vinculados.</div>'; return; } list.innerHTML = words.map(word => `<div class="magic-entry"><span class="magic-word">${escapeHTML(word)}</span><span class="magic-actions"><button class="small-button" data-edit-magic="${encodeURIComponent(word)}">Editar</button><button class="small-button" data-delete-magic="${encodeURIComponent(word)}">Eliminar</button></span></div>`).join(''); list.querySelectorAll('[data-edit-magic]').forEach(btn => btn.addEventListener('click', () => editMagic(decodeURIComponent(btn.dataset.editMagic)))); list.querySelectorAll('[data-delete-magic]').forEach(btn => btn.addEventListener('click', () => deleteMagic(decodeURIComponent(btn.dataset.deleteMagic)))); }
+    function saveMagic() { const word = normalize($('magicWord').value); if (!word) { toast('Escribe una palabra clave'); return; } const magic = getJSON(KEYS.magic, {}); const key = state.editingWord || word; if (!state.editingWord && magic[word]) { toast('Esa palabra ya está vinculada'); return; } magic[key] = getCanvasDataURLTransparent(); if (state.editingWord && state.editingWord !== word) { delete magic[state.editingWord]; magic[word] = magic[key]; delete magic[key]; } setJSON(KEYS.magic, magic); state.editingWord = null; $('magicWord').value = ''; $('magicWord').disabled = false; $('magicSaveButton').textContent = 'Vincular dibujo actual del lienzo'; renderMagicList(); toast('Dibujo mágico vinculado'); }
+    function editMagic(word) { const magic = getJSON(KEYS.magic, {}); state.editingWord = word; $('magicWord').value = word; $('magicWord').disabled = true; $('magicSaveButton').textContent = 'Actualizar dibujo mágico'; navigate('canvas'); loadImageToCanvas(magic[word]); navigate('settings'); }
+    function deleteMagic(word) { const magic = getJSON(KEYS.magic, {}); delete magic[word]; setJSON(KEYS.magic, magic); renderMagicList(); toast('Vínculo eliminado'); }
+    function triggerMagic(word) { const magic = getJSON(KEYS.magic, {}), image = magic[word]; if (!image || Date.now() - state.cooldown < 2000) return; state.cooldown = Date.now(); navigate('canvas'); loadImageToCanvas(image); toast(`Dibujo mágico: ${word}`); }
+    function startListening() { if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) { toast('El reconocimiento de voz no está disponible'); return; } const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition; state.recognition = new Recognition(); state.recognition.lang = 'es-ES'; state.recognition.continuous = true; state.recognition.interimResults = true; state.recognition.onresult = event => { let text = ''; for (let i = event.resultIndex; i < event.results.length; i++) text += event.results[i][0].transcript + ' '; const normalized = normalize(text); Object.keys(getJSON(KEYS.magic, {})).forEach(word => { const safe = normalize(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); if (new RegExp(`(^|\\s)${safe}(?=\\s|$)`, 'i').test(normalized)) triggerMagic(word); }); }; state.recognition.onerror = event => { if (event.error === 'not-allowed') { toast('Permiso de micrófono denegado'); stopListening(); } }; state.recognition.onend = () => { if (state.listening) { try { state.recognition.start(); } catch {} } }; try { state.recognition.start(); state.listening = true; $('pauseButton').classList.remove('hidden'); $('saveButton').classList.add('listening'); $('pauseButton').querySelector('span').textContent = 'Pausar'; if (navigator.vibrate) navigator.vibrate(50); toast('Escucha activada'); } catch { toast('No se pudo activar el micrófono'); } }
+    function stopListening() { state.listening = false; if (state.recognition) { state.recognition.onend = null; try { state.recognition.stop(); } catch {} } $('pauseButton').classList.add('hidden'); $('saveButton').classList.remove('listening'); }
+    function toggleListening() { state.listening ? stopListening() : startListening(); }
+    let pressTimer, progressTimer;
+    function pressStart(event) { if (event.type === 'mousedown' && event.button !== 0) return; $('pressProgress').style.transition = 'width 3s linear'; $('pressProgress').style.width = '100%'; pressTimer = setTimeout(() => { pressTimer = null; toggleListening(); }, 3000); }
+    function pressEnd() { $('pressProgress').style.transition = 'none'; $('pressProgress').style.width = '0'; if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; saveDrawing(); } }
+    function exportBackup() { const backup = { gallery: getJSON(KEYS.gallery, []), settings: settings(), theme_color: localStorage.getItem(KEYS.theme) || THEMES[0], dark_mode: localStorage.getItem(KEYS.dark) === 'true', magic_drawings: getJSON(KEYS.magic, {}) }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `cdraw-respaldo-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(link.href); toast('Respaldo exportado'); }
+    function importBackup(file) { const reader = new FileReader(); reader.onload = () => { try { const b = JSON.parse(reader.result); if (Array.isArray(b.gallery)) setJSON(KEYS.gallery, b.gallery); if (b.settings) setJSON(KEYS.settings, b.settings); if (b.theme_color) localStorage.setItem(KEYS.theme, b.theme_color); if (typeof b.dark_mode === 'boolean') localStorage.setItem(KEYS.dark, String(b.dark_mode)); if (b.magic_drawings && typeof b.magic_drawings === 'object') setJSON(KEYS.magic, b.magic_drawings); applyTheme(); renderGallery(); renderMagicList(); loadSettingsForm(); toast('Respaldo importado'); } catch { toast('El archivo no es un respaldo válido'); } }; reader.readAsText(file); }
+    document.addEventListener('click', event => { const button = event.target.closest('[data-view]'); if (button) navigate(button.dataset.view); });
+    $('menuButton').addEventListener('click', openDrawer); $('drawerBackdrop').addEventListener('click', closeDrawer); $('darkSwitch').addEventListener('click', () => { localStorage.setItem(KEYS.dark, String(localStorage.getItem(KEYS.dark) !== 'true')); applyTheme(); if (state.view === 'canvas') { clearCanvas(false); state.history = []; state.historyIndex = -1; pushHistory(); } if (state.view === 'gallery') renderGallery(); });
+    $('clearButton').addEventListener('click', () => clearCanvas()); $('undoButton').addEventListener('click', undo); $('redoButton').addEventListener('click', redo); $('colorButton').addEventListener('click', () => { const colors = ['#000000','#ffffff','#e53935','#fb8c00','#fdd835','#43a047','#00acc1','#1e88e5','#3949ab','#8e24aa','#6d4c41','#9e9e9e']; state.drawingColor = promptColor(colors); });
+    function promptColor(colors) { const old = state.drawingColor; const chosen = window.prompt ? null : null; const input = document.createElement('input'); input.type = 'color'; input.value = old || (document.body.classList.contains('dark-mode') ? '#ffffff' : '#000000'); input.style.position = 'fixed'; input.style.left = '-100px'; document.body.append(input); input.click(); input.addEventListener('input', () => { state.drawingColor = input.value; input.remove(); }); input.addEventListener('change', () => input.remove()); return state.drawingColor || input.value; }
+    $('sizeButton').addEventListener('click', () => { const next = Number(window.prompt('Grosor del trazo (1-30)', state.brushSize)); if (Number.isFinite(next)) { state.brushSize = Math.min(30, Math.max(1, next)); $('sizeLabel').textContent = `${state.brushSize}px`; } }); $('pauseButton').addEventListener('click', stopListening); $('saveButton').addEventListener('pointerdown', pressStart); $('saveButton').addEventListener('pointerup', pressEnd); $('saveButton').addEventListener('pointercancel', pressEnd); $('saveButton').addEventListener('pointerleave', event => { if (event.buttons) pressEnd(); });
+    canvas.addEventListener('pointerdown', beginDraw); canvas.addEventListener('pointermove', draw); canvas.addEventListener('pointerup', endDraw); canvas.addEventListener('pointercancel', endDraw); window.addEventListener('resize', resizeCanvas);
+    $('bgColor').addEventListener('input', event => { state.bgColor = event.target.value; const s = settings(); s.bgColor = state.bgColor; setJSON(KEYS.settings, s); document.documentElement.style.setProperty('--canvas-bg', state.bgColor); }); $('defaultSize').addEventListener('input', event => { const s = settings(); s.defaultSize = Number(event.target.value); setJSON(KEYS.settings, s); state.brushSize = s.defaultSize; $('defaultSizeValue').textContent = `${s.defaultSize}px`; }); $('magicSaveButton').addEventListener('click', saveMagic); $('exportButton').addEventListener('click', exportBackup); $('importButton').addEventListener('click', () => $('importFile').click()); $('importFile').addEventListener('change', event => { if (event.target.files[0]) importBackup(event.target.files[0]); }); $('modalClose').addEventListener('click', closeModal); $('modalEdit').addEventListener('click', editGalleryItem); $('modalDelete').addEventListener('click', deleteGalleryItem); $('modalBackdrop').addEventListener('click', event => { if (event.target === $('modalBackdrop')) closeModal(); });
+    document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); } if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveDrawing(); } if (event.key === 'Escape') { closeModal(); closeDrawer(); } });
+    window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); state.installPrompt = event; $('installButton').classList.remove('hidden'); }); $('installButton').addEventListener('click', async () => { if (!state.installPrompt) return; state.installPrompt.prompt(); await state.installPrompt.userChoice; state.installPrompt = null; $('installButton').classList.add('hidden'); }); window.addEventListener('appinstalled', () => $('installButton').classList.add('hidden'));
+    function updateOfflineStatus() { const status = $('offlineStatus'); if (!status) return; if (!('serviceWorker' in navigator)) { status.textContent = 'Modo sin conexión: no disponible en este navegador.'; return; } navigator.serviceWorker.ready.then(() => { status.textContent = 'Recursos de la aplicación preparados para funcionar sin conexión.'; }).catch(() => { status.textContent = 'Preparación sin conexión pendiente.'; }); }
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').then(updateOfflineStatus).catch(() => updateOfflineStatus()); });
+    function init() { applyTheme(); setupThemes(); state.drawingColor = document.body.classList.contains('dark-mode') ? '#ffffff' : '#000000'; state.brushSize = settings().defaultSize || 4; loadSettingsForm(); updateOfflineStatus(); navigate('home'); }
+    init();
+  </script>
+</body>
+</html>
